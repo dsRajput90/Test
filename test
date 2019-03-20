@@ -1,0 +1,121 @@
+package com.test.linklist;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.DoubleBinaryOperator;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class RegExEg {
+    public static void main(String[] args) {
+        RegExEg re = new RegExEg();
+        List<Item> items = new ArrayList<>();
+        String []lists = new String[9];
+        lists[0]="1 book at 12.49";
+        lists[1]="1 music CD at 14.99";
+        lists[2]="1 chocolate bar at 0.85";
+        lists[3]="1 imported box of chocolates at 10.00";
+        lists[4]="1 imported bottle of perfume at 47.50";
+        lists[5]="1 imported bottle of perfume at 27.99";
+        lists[6]="1 bottle of perfume at 18.99";
+        lists[7]="1 packet of headache pills at 9.75";
+        lists[8]="3 box of imported chocolates at 11.25";
+
+        String source = "810LN15";//"(([a-zA-Z]+)|(\\d+))|((\\d+)|([a-zA-Z]+))";
+        for(int i=0;i<lists.length;i++){
+            String[] parts = lists[i].split("(\\sat\\s)");
+            Item item = re.new Item();
+            item.itemName=parts[0];
+            item.price = new BigDecimal(parts[1]);
+            re.getItemType(item);
+            items.add(item);
+        }
+
+    }
+
+    /**
+     * BOOK(true,false),
+     * 		MEDICAL(true,false),
+     * 		FOOD(true,false),
+     * 		OTHERS ( false , false),
+     * 		IMPORTED_BOOK(true,true),
+     * 		IMPORTED_MEDICAL(true,true),
+     * 		IMPORTED_FOOD(true,true),
+     * 		IMPORTED_OTHERS(false,true);
+     * */
+    public Item getItemType(Item item){
+        Pattern ptn = Pattern.compile("(.*book|chocolate|pills|food.*)");
+        Pattern imported = Pattern.compile("(.*imported.*)");
+        item.isExempted = ptn.matcher(item.itemName).matches();
+        item.isImported = imported.matcher(item.itemName).matches();
+
+        getTaxType(item);
+        return item;
+    }
+
+    BigDecimal PERCENTAGE = new BigDecimal(100.00f);
+
+    public void getTaxType(Item item){
+        BigDecimal taxPercentage = Case.EXEMPTED.apply(item).add(Case.IMPORTED.apply(item));
+        BigDecimal salesTax = taxPercentage.multiply(item.price).divide(PERCENTAGE);
+        System.out.println(salesTax);
+        System.out.println(salesTax.add(item.price));
+        System.out.println(roundOff(salesTax.add(item.price)));
+        System.out.println("ITEMANEM: " +  item.itemName + " EXEMPTED " + Case.EXEMPTED.apply(item) + " IMPORTED: " + Case.IMPORTED.apply(item));
+    }
+    private static final BigDecimal ROUNDOFF=new BigDecimal(0.05);
+
+    private BigDecimal roundOffTax(BigDecimal tax){
+        return tax.divide(ROUNDOFF).multiply(ROUNDOFF);
+    }
+    protected BigDecimal roundOff(BigDecimal value) {
+        value = value.divide(ROUNDOFF);
+        value = new BigDecimal(Math.ceil(value.doubleValue()));
+        value = value.multiply(ROUNDOFF);
+        return value;
+    }
+    class Item{
+        String itemName;
+        TaxType taxType;
+        BigDecimal price;
+        boolean isExempted;
+        boolean isImported;
+
+    }
+
+    enum Case implements Function<Item, BigDecimal> {
+        EXEMPTED (item -> item.isExempted ? new BigDecimal(10.0f) : new BigDecimal(0.0f)),
+        IMPORTED (item -> item.isImported ? new BigDecimal(5.0f) : new BigDecimal(0.0f));
+
+        private final Function<Item, BigDecimal> func;
+
+        private Case(Function<Item, BigDecimal> func) {
+            this.func = func;
+        }
+
+        boolean isExempted = false;
+
+        @Override
+        public BigDecimal apply(Item item) {
+            return func.apply(item);
+        }
+    }
+
+    enum TaxType{
+        NA(0),
+        BASIC(10.0f / 100),
+        IMPORTED((5.0f / 100)) ;
+        private float applicableTax;
+
+        private TaxType(float tax) {
+            applicableTax = tax;
+        }
+
+        public float getApplicableTax() {
+            return applicableTax;
+        }
+    }
+}
